@@ -11,6 +11,7 @@ public sealed class CourseEnrollmentDesk
     public decimal Tuition { get; }
     public string CourseCode { get; }
     private readonly WelcomePacketBuilder _welcomePacketBuilder = new();
+    private readonly TuitionInvoiceBuilder _tuitionInvoiceBuilder = new();
 
     public CourseEnrollmentDesk(string courseCode, int capacity, decimal tuition)
     {
@@ -54,10 +55,10 @@ public sealed class CourseEnrollmentDesk
 
     public string TuitionInvoiceLine(string studentEmail)
     {
-        // Finance formatting / tax later — separate from enrollment capacity.
-        if (!_seated.Contains(studentEmail)) return $"{CourseCode},WAITLIST,0.00";
-        var vat = Math.Round(Tuition * 0.14m, 2);
-        return $"{CourseCode},TUITION,{Tuition:0.00},VAT,{vat:0.00},TOTAL,{(Tuition + vat):0.00}";
+        return _tuitionInvoiceBuilder.Build(
+            CourseCode,
+            Tuition,
+            _seated.Contains(studentEmail));
     }
 
     public void PromoteFromWaitlist(int seats)
@@ -79,5 +80,17 @@ public sealed class WelcomePacketBuilder
     {
         return $"# Welcome to {courseCode}\nHi {studentName},\nYour status: **{status}**.\n" +
                $"Bring a laptop. Discord onboarding link: https://example.invalid/{courseCode.ToLowerInvariant()}\n";
+    }
+}
+public sealed class TuitionInvoiceBuilder
+{
+    public string Build(string courseCode, decimal tuition, bool seated)
+    {
+        if (!seated)
+            return $"{courseCode},WAITLIST,0.00";
+
+        var vat = Math.Round(tuition * 0.14m, 2);
+
+        return $"{courseCode},TUITION,{tuition:0.00},VAT,{vat:0.00},TOTAL,{(tuition + vat):0.00}";
     }
 }
