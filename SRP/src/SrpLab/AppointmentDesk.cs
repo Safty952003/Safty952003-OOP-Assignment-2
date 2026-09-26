@@ -11,6 +11,7 @@ public sealed class AppointmentDesk
     public int SlotMinutes { get; }
     private readonly BusinessHoursPolicy _businessHoursPolicy = new();
     private readonly IcsEventBuilder _icsEventBuilder = new();
+    private readonly SmsReminderBuilder _smsReminderBuilder = new();
 
     public AppointmentDesk(TimeOnly open, TimeOnly close, int slotMinutes)
     {
@@ -59,8 +60,7 @@ public sealed class AppointmentDesk
 
     public string SmsReminder(DateTimeOffset slot, string clinicPhone)
     {
-        // Messaging channel copy — fourth concern hiding in the "scheduler".
-        return $"Reminder: appointment {slot:MMM dd HH:mm}. Call {clinicPhone} to reschedule.";
+        return _smsReminderBuilder.Build(slot, clinicPhone);
     }
 
     private DateTimeOffset Align(DateTimeOffset from)
@@ -101,5 +101,12 @@ public sealed class IcsEventBuilder
         return "BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\n" +
                $"UID:{uid}\nDTSTART:{slot:yyyyMMdd'T'HHmmss'Z'}\nDTEND:{end:yyyyMMdd'T'HHmmss'Z'}\n" +
                $"SUMMARY:Visit {patientName} / {clinician}\nEND:VEVENT\nEND:VCALENDAR\n";
+    }
+}
+public sealed class SmsReminderBuilder
+{
+    public string Build(DateTimeOffset slot, string clinicPhone)
+    {
+        return $"Reminder: appointment {slot:MMM dd HH:mm}. Call {clinicPhone} to reschedule.";
     }
 }
