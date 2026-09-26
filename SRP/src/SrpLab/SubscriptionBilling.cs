@@ -12,6 +12,7 @@ public sealed class SubscriptionBilling
     public DateOnly PeriodEnd { get; }
     public int FailedPayments { get; private set; }
     private readonly ProrationCalculator _prorationCalculator = new();
+    private readonly DunningEmailBuilder _dunningEmailBuilder = new();
 
     public SubscriptionBilling(string customerId, decimal monthlyPrice, DateOnly periodStart, DateOnly periodEnd)
     {
@@ -39,16 +40,15 @@ public sealed class SubscriptionBilling
 
     public string DunningEmail(string customerName, DateOnly asOf)
     {
-        // Collections tone & legal boilerplate ≠ proration formula.
         var amount = Prorate(PeriodStart);
-        var invoice = NextInvoiceNumber(); // side-effect while composing mail — nasty on purpose
-        var severity = FailedPayments switch
-        {
-            <= 1 => "friendly reminder",
-            2 => "second notice",
-            _ => "final notice before suspension"
-        };
-        return $"Subject: {severity} {invoice}\nHi {customerName},\nBalance {amount:C} as of {asOf:o} ({FailedPayments} failures).\n";
+        var invoice = NextInvoiceNumber();
+
+        return _dunningEmailBuilder.Build(
+            customerName,
+            asOf,
+            amount,
+            invoice,
+            FailedPayments);
     }
 
     public string LedgerJournalLine(DateOnly activeFrom)
@@ -90,5 +90,26 @@ public sealed class InvoiceNumberGenerator
     {
         var n = ++_invoiceSeq;
         return $"INV-{periodStart:yyyyMM}-{n:D5}";
+    }
+}
+public sealed class DunningEmailBuilder
+{
+    public string Build(
+        string customerName,
+        DateOnly asOf,
+        decimal amount,
+        string invoice,
+        int failedPayments)
+    {
+        var severity = failedPayments switch
+        {
+            <= 1 => "friendly reminder",
+            2 => "second notice",
+            _ => "final notice before suspension"
+        };
+
+        return $"Subject: {severity} {invoice}\n" +
+               $"Hi {customerName},\n" +
+               $"Balance {amount:C} as of {asOf:o} ({failedPayments} failures).\n";
     }
 }
