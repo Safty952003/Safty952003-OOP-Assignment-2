@@ -12,6 +12,7 @@ public sealed class LoanDesk
     private readonly RiskScoreCalculator _riskScoreCalculator = new();
     private readonly LoanDocumentRequirements _documentRequirements = new();
     private readonly DecisionLetterBuilder _decisionLetterBuilder = new();
+    private readonly LoanCsvExporter _csvExporter = new();
 
     public LoanDesk(decimal requestedAmount, int creditScore, int employmentMonths, bool hasCollateral)
     {
@@ -53,8 +54,13 @@ public sealed class LoanDesk
 
     public string UnderwriterCsvRow(string applicationId)
     {
-        // Analytics export schema is yet another reason to change.
-        return $"{applicationId},{CreditScore},{EmploymentMonths},{(HasCollateral ? 1 : 0)},{RiskScore():0.00},{(IsEligible() ? "Y" : "N")}";
+        return _csvExporter.Export(
+            applicationId,
+            CreditScore,
+            EmploymentMonths,
+            HasCollateral,
+            RiskScore(),
+            IsEligible());
     }
 }
 
@@ -128,5 +134,19 @@ public sealed class DecisionLetterBuilder
 
         return $"Dear {applicantName},\nWe are unable to approve {requestedAmount:C} at this time.\n" +
                $"Reference risk={riskScore:0}. You may reapply after improving documentation.\n";
+    }
+}
+public sealed class LoanCsvExporter
+{
+    public string Export(
+        string applicationId,
+        int creditScore,
+        int employmentMonths,
+        bool hasCollateral,
+        decimal riskScore,
+        bool isEligible)
+    {
+        return $"{applicationId},{creditScore},{employmentMonths}," +
+               $"{(hasCollateral ? 1 : 0)},{riskScore:0.00},{(isEligible ? "Y" : "N")}";
     }
 }
