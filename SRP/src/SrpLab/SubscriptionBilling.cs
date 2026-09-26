@@ -5,8 +5,7 @@ namespace SrpLab;
 /// </summary>
 public sealed class SubscriptionBilling
 {
-    private static int _invoiceSeq = 1000;
-
+    private readonly InvoiceNumberGenerator _invoiceNumberGenerator = new();
     public string CustomerId { get; }
     public decimal MonthlyPrice { get; }
     public DateOnly PeriodStart { get; }
@@ -33,9 +32,7 @@ public sealed class SubscriptionBilling
 
     public string NextInvoiceNumber()
     {
-        // Numbering scheme / fiscal prefixes — ops concern, not pricing.
-        var n = ++_invoiceSeq;
-        return $"INV-{PeriodStart:yyyyMM}-{n:D5}";
+        return _invoiceNumberGenerator.Generate(PeriodStart);
     }
 
     public void RegisterFailedPayment() => FailedPayments++;
@@ -83,5 +80,15 @@ public sealed class ProrationCalculator
         var used = periodEnd.DayNumber - activeFrom.DayNumber;
 
         return Math.Round(monthlyPrice * used / totalDays, 2);
+    }
+}
+public sealed class InvoiceNumberGenerator
+{
+    private static int _invoiceSeq = 1000;
+
+    public string Generate(DateOnly periodStart)
+    {
+        var n = ++_invoiceSeq;
+        return $"INV-{periodStart:yyyyMM}-{n:D5}";
     }
 }
