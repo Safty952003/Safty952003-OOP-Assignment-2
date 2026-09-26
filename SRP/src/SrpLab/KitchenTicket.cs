@@ -6,6 +6,7 @@ namespace SrpLab;
 public sealed class KitchenTicket
 {
     private readonly List<(string Item, List<string> Ingredients, int PrepMinutes)> _items = new();
+    private readonly AllergenDetector _allergenDetector = new();
 
     public void AddItem(string item, IEnumerable<string> ingredients, int prepMinutes)
     {
@@ -14,19 +15,8 @@ public sealed class KitchenTicket
 
     public IReadOnlyList<string> DetectAllergens()
     {
-        // Regulatory allergen dictionary changes separately from ticket layout.
-        var hits = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (_, ingredients, _) in _items)
-        {
-            foreach (var ing in ingredients)
-            {
-                if (ing.Contains("milk") || ing.Contains("cheese") || ing.Contains("butter")) hits.Add("dairy");
-                if (ing.Contains("wheat") || ing.Contains("flour") || ing.Contains("bread")) hits.Add("gluten");
-                if (ing.Contains("peanut") || ing.Contains("almond") || ing.Contains("cashew")) hits.Add("nuts");
-                if (ing.Contains("shrimp") || ing.Contains("prawn") || ing.Contains("crab")) hits.Add("shellfish");
-            }
-        }
-        return hits.OrderBy(x => x).ToList();
+        return _allergenDetector.Detect(
+            _items.Select(i => i.Ingredients));
     }
 
     public int EstimatedReadyMinutes(int openStations)
@@ -54,5 +44,34 @@ public sealed class KitchenTicket
     public string ExpoLaneHint()
     {
         return DetectAllergens().Count > 0 ? "LANE-ALLERGY" : EstimatedReadyMinutes(2) > 20 ? "LANE-SLOW" : "LANE-FAST";
+    }
+}
+
+public sealed class AllergenDetector
+{
+    public IReadOnlyList<string> Detect(
+        IEnumerable<List<string>> ingredientsLists)
+    {
+        var hits = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var ingredients in ingredientsLists)
+        {
+            foreach (var ing in ingredients)
+            {
+                if (ing.Contains("milk") || ing.Contains("cheese") || ing.Contains("butter"))
+                    hits.Add("dairy");
+
+                if (ing.Contains("wheat") || ing.Contains("flour") || ing.Contains("bread"))
+                    hits.Add("gluten");
+
+                if (ing.Contains("peanut") || ing.Contains("almond") || ing.Contains("cashew"))
+                    hits.Add("nuts");
+
+                if (ing.Contains("shrimp") || ing.Contains("prawn") || ing.Contains("crab"))
+                    hits.Add("shellfish");
+            }
+        }
+
+        return hits.OrderBy(x => x).ToList();
     }
 }
