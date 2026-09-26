@@ -9,6 +9,7 @@ public sealed class WarehousePickList
     private readonly InventoryAllocator _inventoryAllocator = new();
     private readonly WalkingOrderPlanner _walkingOrderPlanner = new();
     private readonly PickerScriptBuilder _pickerScriptBuilder = new();
+    private readonly WmsXmlBuilder _wmsXmlBuilder = new();
 
     public void AddNeed(string sku, string aisle, int bin, int qtyNeeded, int qtyOnHand)
     {
@@ -35,9 +36,9 @@ public sealed class WarehousePickList
 
     public string WmsXmlBatch(string batchId)
     {
-        // Integration contract with WMS — third reason to change.
-        var parts = Allocate().Select(a => $"<line sku=\"{a.Sku}\" qty=\"{a.Allocated}\" />");
-        return $"<batch id=\"{batchId}\">{string.Join("", parts)}</batch>";
+        return _wmsXmlBuilder.Build(
+            batchId,
+            Allocate());
     }
 }
 
@@ -96,5 +97,17 @@ public sealed class PickerScriptBuilder
             : "SHORTAGES: none";
 
         return string.Join('\n', steps) + "\n" + warn;
+    }
+}
+public sealed class WmsXmlBuilder
+{
+    public string Build(
+        string batchId,
+        IEnumerable<(string Sku, int Allocated)> allocations)
+    {
+        var parts = allocations
+            .Select(a => $"<line sku=\"{a.Sku}\" qty=\"{a.Allocated}\" />");
+
+        return $"<batch id=\"{batchId}\">{string.Join("", parts)}</batch>";
     }
 }
