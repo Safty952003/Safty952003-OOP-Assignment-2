@@ -4,9 +4,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SrpLab
+public sealed class GiftWrapCalculator
 {
-    internal class GiftWrapCalculator
+    public decimal Calculate(bool enabled)
     {
+        return enabled ? 4.99m : 0m;
     }
 }

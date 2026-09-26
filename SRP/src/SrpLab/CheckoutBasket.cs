@@ -8,6 +8,10 @@ public sealed class CheckoutBasket
     private readonly List<(string Sku, decimal Price, int Qty)> _lines = new();
     private string? _couponRaw;
     private bool _giftWrap;
+    private readonly CouponCalculator _couponCalculator = new();
+    private readonly GiftMessageBuilder _giftMessageBuilder = new();
+    private readonly PaymentAuthorizer _paymentAuthorizer = new();
+    private readonly GiftWrapCalculator _giftWrapCalculator = new();
 
     public void AddLine(string sku, decimal price, int qty)
     {
@@ -22,35 +26,32 @@ public sealed class CheckoutBasket
 
     public decimal DiscountAmount()
     {
-        // Parsing marketing strings is a different reason to change than pricing math.
-        if (string.IsNullOrWhiteSpace(_couponRaw)) return 0m;
-        var t = _couponRaw.Trim().ToUpperInvariant();
-        if (t.StartsWith("SAVE") && int.TryParse(t[4..], out var pct) && pct is > 0 and <= 50)
-            return Math.Round(SubTotal() * pct / 100m, 2);
-        if (t.Contains("FREESHIP")) return 0m; // ship is elsewhere — still parsed here
-        if (t == "WELCOME10") return Math.Min(10m, SubTotal());
-        return 0m;
+        return _couponCalculator.Calculate(_couponRaw, SubTotal());
     }
 
     public decimal GrandTotal()
     {
         var total = SubTotal() - DiscountAmount();
-        if (_giftWrap) total += 4.99m; // packaging fee policy ≠ cart math
+        total += _giftWrapCalculator.Calculate(_giftWrap);
+
         return Math.Max(0m, total);
     }
 
     public string GiftMessageCard(string fromName)
     {
-        // Customer-facing copy will change with marketing, not with totals.
-        var items = string.Join(", ", _lines.Select(l => l.Sku));
-        return $"Dear friend,\nA gift from {fromName} awaits ({items}).\nTotal surprise value: {GrandTotal():C}\n";
+        var items = _lines.Select(l => l.Sku);
+
+        return _giftMessageBuilder.Build(
+            fromName,
+            items,
+            GrandTotal());
     }
 
     public string AuthorizePaymentStub(string cardLast4)
     {
-        // Pretends to talk to a gateway — auth scheme changes independently of cart rules.
-        var payload = $"{GrandTotal():0.00}|{cardLast4}|{_lines.Count}";
-        var hash = payload.GetHashCode();
-        return $"AUTH-{Math.Abs(hash):X8}";
+        return _paymentAuthorizer.Authorize(
+            GrandTotal(),
+            cardLast4,
+            _lines.Count);
     }
 }
