@@ -7,6 +7,7 @@ public sealed class WarehousePickList
 {
     private readonly List<(string Sku, string Aisle, int Bin, int QtyNeeded, int QtyOnHand)> _lines = new();
     private readonly InventoryAllocator _inventoryAllocator = new();
+    private readonly WalkingOrderPlanner _walkingOrderPlanner = new();
 
     public void AddNeed(string sku, string aisle, int bin, int qtyNeeded, int qtyOnHand)
     {
@@ -20,13 +21,7 @@ public sealed class WarehousePickList
 
     public IReadOnlyList<(string Aisle, int Bin, string Sku, int Qty)> WalkingOrder()
     {
-        // Path heuristic will change with warehouse layout tech.
-        return _lines
-            .OrderBy(l => l.Aisle)
-            .ThenBy(l => l.Bin)
-            .Select(l => (l.Aisle, l.Bin, l.Sku, Math.Min(l.QtyNeeded, l.QtyOnHand)))
-            .Where(x => x.Item4 > 0)
-            .ToList();
+        return _walkingOrderPlanner.Plan(_lines);
     }
 
     public string PickerScript()
@@ -67,5 +62,22 @@ public sealed class InventoryAllocator
         }
 
         return result;
+    }
+}
+public sealed class WalkingOrderPlanner
+{
+    public IReadOnlyList<(string Aisle, int Bin, string Sku, int Qty)> Plan(
+        IEnumerable<(string Sku, string Aisle, int Bin, int QtyNeeded, int QtyOnHand)> lines)
+    {
+        return lines
+            .OrderBy(l => l.Aisle)
+            .ThenBy(l => l.Bin)
+            .Select(l => (
+                l.Aisle,
+                l.Bin,
+                l.Sku,
+                Math.Min(l.QtyNeeded, l.QtyOnHand)))
+            .Where(x => x.Item4 > 0)
+            .ToList();
     }
 }
