@@ -9,6 +9,7 @@ public sealed class KitchenTicket
     private readonly AllergenDetector _allergenDetector = new();
     private readonly PrepTimeCalculator _prepTimeCalculator = new();
     private readonly ThermalTicketRenderer _thermalTicketRenderer = new();
+    private readonly ExpoLaneSelector _expoLaneSelector = new();
 
     public void AddItem(string item, IEnumerable<string> ingredients, int prepMinutes)
     {
@@ -42,7 +43,9 @@ public sealed class KitchenTicket
 
     public string ExpoLaneHint()
     {
-        return DetectAllergens().Count > 0 ? "LANE-ALLERGY" : EstimatedReadyMinutes(2) > 20 ? "LANE-SLOW" : "LANE-FAST";
+        return _expoLaneSelector.Select(
+            DetectAllergens().Count,
+            EstimatedReadyMinutes(2));
     }
 }
 
@@ -119,5 +122,16 @@ public sealed class ThermalTicketRenderer
             : "ALLERGENS: " + string.Join(",", allergens);
 
         return $"{line}\nORDER #{orderNumber}\nETA {estimatedMinutes} MIN\n{body}\n{allergyLine}\n{line}\n";
+    }
+}
+public sealed class ExpoLaneSelector
+{
+    public string Select(int allergenCount, int estimatedMinutes)
+    {
+        return allergenCount > 0
+            ? "LANE-ALLERGY"
+            : estimatedMinutes > 20
+                ? "LANE-SLOW"
+                : "LANE-FAST";
     }
 }
