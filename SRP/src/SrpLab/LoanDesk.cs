@@ -11,6 +11,7 @@ public sealed class LoanDesk
     public bool HasCollateral { get; }
     private readonly RiskScoreCalculator _riskScoreCalculator = new();
     private readonly LoanDocumentRequirements _documentRequirements = new();
+    private readonly DecisionLetterBuilder _decisionLetterBuilder = new();
 
     public LoanDesk(decimal requestedAmount, int creditScore, int employmentMonths, bool hasCollateral)
     {
@@ -42,15 +43,12 @@ public sealed class LoanDesk
 
     public string DecisionLetter(string applicantName)
     {
-        // Legal/comms wording ≠ underwriting math.
-        if (IsEligible())
-        {
-            return $"Dear {applicantName},\nYour request for {RequestedAmount:C} is pre-approved (risk {RiskScore():0}).\n" +
-                   $"Please upload: {string.Join("; ", RequiredDocuments())}.\n";
-        }
-
-        return $"Dear {applicantName},\nWe are unable to approve {RequestedAmount:C} at this time.\n" +
-               $"Reference risk={RiskScore():0}. You may reapply after improving documentation.\n";
+        return _decisionLetterBuilder.Build(
+            applicantName,
+            RequestedAmount,
+            RiskScore(),
+            IsEligible(),
+            RequiredDocuments());
     }
 
     public string UnderwriterCsvRow(string applicationId)
@@ -111,5 +109,24 @@ public sealed class LoanDocumentRequirements
             docs.Add("Manual underwriter referral form");
 
         return docs;
+    }
+}
+public sealed class DecisionLetterBuilder
+{
+    public string Build(
+        string applicantName,
+        decimal requestedAmount,
+        decimal riskScore,
+        bool isEligible,
+        IReadOnlyList<string> documents)
+    {
+        if (isEligible)
+        {
+            return $"Dear {applicantName},\nYour request for {requestedAmount:C} is pre-approved (risk {riskScore:0}).\n" +
+                   $"Please upload: {string.Join("; ", documents)}.\n";
+        }
+
+        return $"Dear {applicantName},\nWe are unable to approve {requestedAmount:C} at this time.\n" +
+               $"Reference risk={riskScore:0}. You may reapply after improving documentation.\n";
     }
 }
