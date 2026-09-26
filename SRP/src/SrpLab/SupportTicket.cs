@@ -10,6 +10,7 @@ public sealed class SupportTicket
     public string Body { get; private set; }
     public DateTimeOffset OpenedAt { get; }
     public string Priority { get; private set; } = "P3";
+    private readonly PriorityCalculator _priorityCalculator = new();
 
     public SupportTicket(string id, string subject, string body, DateTimeOffset openedAt)
     {
@@ -28,14 +29,7 @@ public sealed class SupportTicket
 
     public void RecalculatePriorityFromText()
     {
-        // Keyword heuristics will churn with support playbooks; SLA math will not.
-        var blob = (Subject + " " + Body).ToLowerInvariant();
-        if (blob.Contains("down") || blob.Contains("outage") || blob.Contains("cannot login"))
-            Priority = "P1";
-        else if (blob.Contains("urgent") || blob.Contains("asap") || blob.Contains("blocked"))
-            Priority = "P2";
-        else
-            Priority = "P3";
+        Priority = _priorityCalculator.Calculate(Subject, Body);
     }
 
     public DateTimeOffset SlaDeadline()
@@ -62,5 +56,25 @@ public sealed class SupportTicket
     public string InternalEscalationBlurb()
     {
         return $"ESCALATE {Id} priority={Priority} breachAt={SlaDeadline():u} keywords-scanned=yes";
+    }
+}
+
+public sealed class PriorityCalculator
+{
+    public string Calculate(string subject, string body)
+    {
+        var blob = (subject + " " + body).ToLowerInvariant();
+
+        if (blob.Contains("down") ||
+            blob.Contains("outage") ||
+            blob.Contains("cannot login"))
+            return "P1";
+
+        if (blob.Contains("urgent") ||
+            blob.Contains("asap") ||
+            blob.Contains("blocked"))
+            return "P2";
+
+        return "P3";
     }
 }
