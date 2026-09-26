@@ -6,6 +6,7 @@ namespace SrpLab;
 public sealed class WarehousePickList
 {
     private readonly List<(string Sku, string Aisle, int Bin, int QtyNeeded, int QtyOnHand)> _lines = new();
+    private readonly InventoryAllocator _inventoryAllocator = new();
 
     public void AddNeed(string sku, string aisle, int bin, int qtyNeeded, int qtyOnHand)
     {
@@ -14,14 +15,7 @@ public sealed class WarehousePickList
 
     public IReadOnlyList<(string Sku, int Allocated)> Allocate()
     {
-        // Allocation/backorder policy ≠ walking path ≠ human instructions.
-        var result = new List<(string, int)>();
-        foreach (var line in _lines)
-        {
-            var alloc = Math.Min(line.QtyNeeded, line.QtyOnHand);
-            result.Add((line.Sku, alloc));
-        }
-        return result;
+        return _inventoryAllocator.Allocate(_lines);
     }
 
     public IReadOnlyList<(string Aisle, int Bin, string Sku, int Qty)> WalkingOrder()
@@ -56,5 +50,22 @@ public sealed class WarehousePickList
         // Integration contract with WMS — third reason to change.
         var parts = Allocate().Select(a => $"<line sku=\"{a.Sku}\" qty=\"{a.Allocated}\" />");
         return $"<batch id=\"{batchId}\">{string.Join("", parts)}</batch>";
+    }
+}
+
+public sealed class InventoryAllocator
+{
+    public IReadOnlyList<(string Sku, int Allocated)> Allocate(
+        IEnumerable<(string Sku, string Aisle, int Bin, int QtyNeeded, int QtyOnHand)> lines)
+    {
+        var result = new List<(string, int)>();
+
+        foreach (var line in lines)
+        {
+            var allocated = Math.Min(line.QtyNeeded, line.QtyOnHand);
+            result.Add((line.Sku, allocated));
+        }
+
+        return result;
     }
 }
