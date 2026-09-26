@@ -6,6 +6,7 @@ namespace SrpLab;
 public sealed class GradeBook
 {
     private readonly Dictionary<string, List<decimal>> _scores = new(StringComparer.OrdinalIgnoreCase);
+    private readonly GradePolicy _gradePolicy = new();
 
     public void Record(string studentId, decimal score)
     {
@@ -26,13 +27,7 @@ public sealed class GradeBook
 
     public string Letter(string studentId)
     {
-        // Academic policy bands change with faculty senate — not with CSV layout.
-        var avg = Average(studentId);
-        if (avg >= 90) return "A";
-        if (avg >= 80) return "B";
-        if (avg >= 70) return "C";
-        if (avg >= 60) return "D";
-        return "F";
+        return _gradePolicy.GetLetter(Average(studentId));
     }
 
     public bool MeetsHonorRoll(string studentId)
@@ -53,5 +48,17 @@ public sealed class GradeBook
         foreach (var id in _scores.Keys.OrderBy(x => x))
             rows.Add($"{id},{Average(id)},{Letter(id)},{(MeetsHonorRoll(id) ? 1 : 0)}");
         return string.Join('\n', rows);
+    }
+}
+
+public sealed class GradePolicy
+{
+    public string GetLetter(decimal average)
+    {
+        if (average >= 90) return "A";
+        if (average >= 80) return "B";
+        if (average >= 70) return "C";
+        if (average >= 60) return "D";
+        return "F";
     }
 }
