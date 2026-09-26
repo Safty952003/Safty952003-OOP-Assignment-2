@@ -13,6 +13,7 @@ public sealed class SupportTicket
     private readonly PriorityCalculator _priorityCalculator = new();
     private readonly SlaCalculator _slaCalculator = new();
     private readonly PublicReplyBuilder _publicReplyBuilder = new();
+    private readonly EscalationMessageBuilder _escalationMessageBuilder = new();
 
     public SupportTicket(string id, string subject, string body, DateTimeOffset openedAt)
     {
@@ -52,7 +53,10 @@ public sealed class SupportTicket
 
     public string InternalEscalationBlurb()
     {
-        return $"ESCALATE {Id} priority={Priority} breachAt={SlaDeadline():u} keywords-scanned=yes";
+        return _escalationMessageBuilder.Build(
+            Id,
+            Priority,
+            SlaDeadline());
     }
 }
 
@@ -98,5 +102,12 @@ public sealed class PublicReplyBuilder
             : "Thanks for reaching out.";
 
         return $"Hi,\n{apology}\nTicket {ticketId} is with {agentName}. Next update before {slaDeadline:u}.\n";
+    }
+}
+public sealed class EscalationMessageBuilder
+{
+    public string Build(string ticketId, string priority, DateTimeOffset slaDeadline)
+    {
+        return $"ESCALATE {ticketId} priority={priority} breachAt={slaDeadline:u} keywords-scanned=yes";
     }
 }
