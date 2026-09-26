@@ -10,6 +10,7 @@ public sealed class LoanDesk
     public int EmploymentMonths { get; }
     public bool HasCollateral { get; }
     private readonly RiskScoreCalculator _riskScoreCalculator = new();
+    private readonly LoanDocumentRequirements _documentRequirements = new();
 
     public LoanDesk(decimal requestedAmount, int creditScore, int employmentMonths, bool hasCollateral)
     {
@@ -32,13 +33,11 @@ public sealed class LoanDesk
 
     public IReadOnlyList<string> RequiredDocuments()
     {
-        // Compliance checklist changes with regulation, independently of risk formula.
-        var docs = new List<string> { "National ID", "Proof of income (3 months)" };
-        if (RequestedAmount > 40_000m) docs.Add("Bank statements (6 months)");
-        if (HasCollateral) docs.Add("Collateral ownership deed");
-        if (EmploymentMonths < 12) docs.Add("Employer letter");
-        if (!IsEligible()) docs.Add("Manual underwriter referral form");
-        return docs;
+        return _documentRequirements.GetRequiredDocuments(
+            RequestedAmount,
+            EmploymentMonths,
+            HasCollateral,
+            IsEligible());
     }
 
     public string DecisionLetter(string applicantName)
@@ -83,5 +82,34 @@ public sealed class RiskScoreCalculator
             score -= 10m;
 
         return Math.Clamp(score, 0m, 100m);
+    }
+}
+public sealed class LoanDocumentRequirements
+{
+    public IReadOnlyList<string> GetRequiredDocuments(
+        decimal requestedAmount,
+        int employmentMonths,
+        bool hasCollateral,
+        bool isEligible)
+    {
+        var docs = new List<string>
+        {
+            "National ID",
+            "Proof of income (3 months)"
+        };
+
+        if (requestedAmount > 40_000m)
+            docs.Add("Bank statements (6 months)");
+
+        if (hasCollateral)
+            docs.Add("Collateral ownership deed");
+
+        if (employmentMonths < 12)
+            docs.Add("Employer letter");
+
+        if (!isEligible)
+            docs.Add("Manual underwriter referral form");
+
+        return docs;
     }
 }
