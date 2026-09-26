@@ -9,6 +9,7 @@ public sealed class GradeBook
     private readonly GradePolicy _gradePolicy = new();
     private readonly HonorRollPolicy _honorRollPolicy = new();
     private readonly TranscriptBuilder _transcriptBuilder = new();
+    private readonly GradeBookCsvExporter _csvExporter = new();
 
     public void Record(string studentId, decimal score)
     {
@@ -52,10 +53,11 @@ public sealed class GradeBook
 
     public string ExportCsv()
     {
-        var rows = new List<string> { "studentId,average,letter,honor" };
-        foreach (var id in _scores.Keys.OrderBy(x => x))
-            rows.Add($"{id},{Average(id)},{Letter(id)},{(MeetsHonorRoll(id) ? 1 : 0)}");
-        return string.Join('\n', rows);
+        return _csvExporter.Export(
+            _scores.Keys,
+            Average,
+            Letter,
+            MeetsHonorRoll);
     }
 }
 
@@ -90,5 +92,24 @@ public sealed class TranscriptBuilder
                $"Average: {average}\n" +
                $"Letter: {letter}\n" +
                $"Honor: {honor}\n";
+    }
+}
+public sealed class GradeBookCsvExporter
+{
+    public string Export(
+        IEnumerable<string> studentIds,
+        Func<string, decimal> average,
+        Func<string, string> letter,
+        Func<string, bool> honor)
+    {
+        var rows = new List<string> { "studentId,average,letter,honor" };
+
+        foreach (var id in studentIds.OrderBy(x => x))
+        {
+            rows.Add(
+                $"{id},{average(id)},{letter(id)},{(honor(id) ? 1 : 0)}");
+        }
+
+        return string.Join('\n', rows);
     }
 }
