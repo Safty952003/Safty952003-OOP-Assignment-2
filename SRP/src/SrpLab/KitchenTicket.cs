@@ -7,6 +7,7 @@ public sealed class KitchenTicket
 {
     private readonly List<(string Item, List<string> Ingredients, int PrepMinutes)> _items = new();
     private readonly AllergenDetector _allergenDetector = new();
+    private readonly PrepTimeCalculator _prepTimeCalculator = new();
 
     public void AddItem(string item, IEnumerable<string> ingredients, int prepMinutes)
     {
@@ -21,13 +22,10 @@ public sealed class KitchenTicket
 
     public int EstimatedReadyMinutes(int openStations)
     {
-        // Kitchen ops model ≠ printing.
-        if (openStations <= 0) openStations = 1;
-        var sequential = _items.Sum(i => i.PrepMinutes);
-        var parallel = (int)Math.Ceiling(sequential / (double)openStations);
-        if (DetectAllergens().Count > 0) parallel += 3; // allergy protocol delay mixed in
-        var longest = _items.Count == 0 ? 0 : _items.Max(i => i.PrepMinutes);
-        return Math.Max(parallel, longest);
+        return _prepTimeCalculator.Calculate(
+            _items,
+            openStations,
+            DetectAllergens().Count);
     }
 
     public string RenderThermalTicket(int orderNumber)
@@ -73,5 +71,30 @@ public sealed class AllergenDetector
         }
 
         return hits.OrderBy(x => x).ToList();
+    }
+}
+public sealed class PrepTimeCalculator
+{
+    public int Calculate(
+        IEnumerable<(string Item, List<string> Ingredients, int PrepMinutes)> items,
+        int openStations,
+        int allergenCount)
+    {
+        if (openStations <= 0)
+            openStations = 1;
+
+        var itemList = items.ToList();
+
+        var sequential = itemList.Sum(i => i.PrepMinutes);
+        var parallel = (int)Math.Ceiling(sequential / (double)openStations);
+
+        if (allergenCount > 0)
+            parallel += 3;
+
+        var longest = itemList.Count == 0
+            ? 0
+            : itemList.Max(i => i.PrepMinutes);
+
+        return Math.Max(parallel, longest);
     }
 }
