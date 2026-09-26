@@ -9,6 +9,7 @@ public sealed class LoanDesk
     public int CreditScore { get; }
     public int EmploymentMonths { get; }
     public bool HasCollateral { get; }
+    private readonly RiskScoreCalculator _riskScoreCalculator = new();
 
     public LoanDesk(decimal requestedAmount, int creditScore, int employmentMonths, bool hasCollateral)
     {
@@ -20,13 +21,11 @@ public sealed class LoanDesk
 
     public decimal RiskScore()
     {
-        // Risk model will change with risk committee — not with letter templates.
-        decimal score = 100m;
-        score -= Math.Max(0, 700 - CreditScore) * 0.15m;
-        if (EmploymentMonths < 6) score -= 20m;
-        if (RequestedAmount > 50_000m && !HasCollateral) score -= 25m;
-        if (RequestedAmount > 150_000m) score -= 10m;
-        return Math.Clamp(score, 0m, 100m);
+        return _riskScoreCalculator.Calculate(
+            RequestedAmount,
+            CreditScore,
+            EmploymentMonths,
+            HasCollateral);
     }
 
     public bool IsEligible() => RiskScore() >= 55m && CreditScore >= 580;
@@ -59,5 +58,30 @@ public sealed class LoanDesk
     {
         // Analytics export schema is yet another reason to change.
         return $"{applicationId},{CreditScore},{EmploymentMonths},{(HasCollateral ? 1 : 0)},{RiskScore():0.00},{(IsEligible() ? "Y" : "N")}";
+    }
+}
+
+public sealed class RiskScoreCalculator
+{
+    public decimal Calculate(
+        decimal requestedAmount,
+        int creditScore,
+        int employmentMonths,
+        bool hasCollateral)
+    {
+        decimal score = 100m;
+
+        score -= Math.Max(0, 700 - creditScore) * 0.15m;
+
+        if (employmentMonths < 6)
+            score -= 20m;
+
+        if (requestedAmount > 50_000m && !hasCollateral)
+            score -= 25m;
+
+        if (requestedAmount > 150_000m)
+            score -= 10m;
+
+        return Math.Clamp(score, 0m, 100m);
     }
 }
