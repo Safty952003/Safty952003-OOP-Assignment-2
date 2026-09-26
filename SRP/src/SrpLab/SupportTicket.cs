@@ -11,6 +11,8 @@ public sealed class SupportTicket
     public DateTimeOffset OpenedAt { get; }
     public string Priority { get; private set; } = "P3";
     private readonly PriorityCalculator _priorityCalculator = new();
+    private readonly SlaCalculator _slaCalculator = new();
+    private readonly PublicReplyBuilder _publicReplyBuilder = new();
 
     public SupportTicket(string id, string subject, string body, DateTimeOffset openedAt)
     {
@@ -34,23 +36,18 @@ public sealed class SupportTicket
 
     public DateTimeOffset SlaDeadline()
     {
-        // Operational SLA policy — different stakeholders than reply wording.
-        var hours = Priority switch
-        {
-            "P1" => 4,
-            "P2" => 24,
-            _ => 72
-        };
-        return OpenedAt.AddHours(hours);
+        return _slaCalculator.Calculate(Priority, OpenedAt);
     }
 
     public bool IsBreached(DateTimeOffset now) => now > SlaDeadline();
 
     public string DraftPublicReply(string agentName)
     {
-        // Tone/templates owned by CX — not by SLA engineering.
-        var apology = Priority == "P1" ? "We are treating this as a critical incident." : "Thanks for reaching out.";
-        return $"Hi,\n{apology}\nTicket {Id} is with {agentName}. Next update before {SlaDeadline():u}.\n";
+        return _publicReplyBuilder.Build(
+            Id,
+            Priority,
+            agentName,
+            SlaDeadline());
     }
 
     public string InternalEscalationBlurb()
@@ -76,5 +73,30 @@ public sealed class PriorityCalculator
             return "P2";
 
         return "P3";
+    }
+}
+public sealed class SlaCalculator
+{
+    public DateTimeOffset Calculate(string priority, DateTimeOffset openedAt)
+    {
+        var hours = priority switch
+        {
+            "P1" => 4,
+            "P2" => 24,
+            _ => 72
+        };
+
+        return openedAt.AddHours(hours);
+    }
+}
+public sealed class PublicReplyBuilder
+{
+    public string Build(string ticketId, string priority, string agentName, DateTimeOffset slaDeadline)
+    {
+        var apology = priority == "P1"
+            ? "We are treating this as a critical incident."
+            : "Thanks for reaching out.";
+
+        return $"Hi,\n{apology}\nTicket {ticketId} is with {agentName}. Next update before {slaDeadline:u}.\n";
     }
 }
