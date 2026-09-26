@@ -13,6 +13,7 @@ public sealed class SubscriptionBilling
     public int FailedPayments { get; private set; }
     private readonly ProrationCalculator _prorationCalculator = new();
     private readonly DunningEmailBuilder _dunningEmailBuilder = new();
+    private readonly LedgerJournalBuilder _ledgerJournalBuilder = new();
 
     public SubscriptionBilling(string customerId, decimal monthlyPrice, DateOnly periodStart, DateOnly periodEnd)
     {
@@ -53,8 +54,10 @@ public sealed class SubscriptionBilling
 
     public string LedgerJournalLine(DateOnly activeFrom)
     {
-        // Accounting export format is another axis of change.
-        return $"{CustomerId},{NextInvoiceNumber()},{Prorate(activeFrom):0.00},AR-SUB";
+        return _ledgerJournalBuilder.Build(
+            CustomerId,
+            NextInvoiceNumber(),
+            Prorate(activeFrom));
     }
 }
 
@@ -111,5 +114,15 @@ public sealed class DunningEmailBuilder
         return $"Subject: {severity} {invoice}\n" +
                $"Hi {customerName},\n" +
                $"Balance {amount:C} as of {asOf:o} ({failedPayments} failures).\n";
+    }
+}
+public sealed class LedgerJournalBuilder
+{
+    public string Build(
+        string customerId,
+        string invoiceNumber,
+        decimal amount)
+    {
+        return $"{customerId},{invoiceNumber},{amount:0.00},AR-SUB";
     }
 }
