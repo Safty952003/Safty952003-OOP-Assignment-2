@@ -7,6 +7,7 @@ public sealed class GradeBook
 {
     private readonly Dictionary<string, List<decimal>> _scores = new(StringComparer.OrdinalIgnoreCase);
     private readonly GradePolicy _gradePolicy = new();
+    private readonly HonorRollPolicy _honorRollPolicy = new();
 
     public void Record(string studentId, decimal score)
     {
@@ -32,8 +33,10 @@ public sealed class GradeBook
 
     public bool MeetsHonorRoll(string studentId)
     {
-        // Extra academic rule set embedded beside averaging.
-        return Average(studentId) >= 85 && Letter(studentId) is "A" or "B";
+        var average = Average(studentId);
+        var letter = Letter(studentId);
+
+        return _honorRollPolicy.Meets(average, letter);
     }
 
     public string TranscriptPlain(string studentId, string fullName)
@@ -60,5 +63,12 @@ public sealed class GradePolicy
         if (average >= 70) return "C";
         if (average >= 60) return "D";
         return "F";
+    }
+}
+public sealed class HonorRollPolicy
+{
+    public bool Meets(decimal average, string letter)
+    {
+        return average >= 85 && letter is "A" or "B";
     }
 }
