@@ -9,6 +9,7 @@ public sealed class AppointmentDesk
     public TimeOnly Open { get; }
     public TimeOnly Close { get; }
     public int SlotMinutes { get; }
+    private readonly BusinessHoursPolicy _businessHoursPolicy = new();
 
     public AppointmentDesk(TimeOnly open, TimeOnly close, int slotMinutes)
     {
@@ -19,10 +20,11 @@ public sealed class AppointmentDesk
 
     public bool IsWithinBusinessHours(DateTimeOffset when)
     {
-        // Clinic calendar policy — HR/ops — not the same as ICS serialization.
-        if (when.DayOfWeek is DayOfWeek.Friday or DayOfWeek.Saturday) return false;
-        var t = TimeOnly.FromDateTime(when.DateTime);
-        return t >= Open && t.AddMinutes(SlotMinutes) <= Close;
+        return _businessHoursPolicy.IsWithin(
+            when,
+            Open,
+            Close,
+            SlotMinutes);
     }
 
     public DateTimeOffset? FindNextSlot(DateTimeOffset from, int searchHours)
@@ -65,5 +67,23 @@ public sealed class AppointmentDesk
     {
         var minutes = from.Minute - (from.Minute % SlotMinutes);
         return new DateTimeOffset(from.Year, from.Month, from.Day, from.Hour, minutes, 0, from.Offset);
+    }
+}
+
+public sealed class BusinessHoursPolicy
+{
+    public bool IsWithin(
+        DateTimeOffset when,
+        TimeOnly open,
+        TimeOnly close,
+        int slotMinutes)
+    {
+        if (when.DayOfWeek is DayOfWeek.Friday or DayOfWeek.Saturday)
+            return false;
+
+        var time = TimeOnly.FromDateTime(when.DateTime);
+
+        return time >= open &&
+               time.AddMinutes(slotMinutes) <= close;
     }
 }
