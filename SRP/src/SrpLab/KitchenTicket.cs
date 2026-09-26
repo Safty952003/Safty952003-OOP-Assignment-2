@@ -8,6 +8,7 @@ public sealed class KitchenTicket
     private readonly List<(string Item, List<string> Ingredients, int PrepMinutes)> _items = new();
     private readonly AllergenDetector _allergenDetector = new();
     private readonly PrepTimeCalculator _prepTimeCalculator = new();
+    private readonly ThermalTicketRenderer _thermalTicketRenderer = new();
 
     public void AddItem(string item, IEnumerable<string> ingredients, int prepMinutes)
     {
@@ -30,13 +31,13 @@ public sealed class KitchenTicket
 
     public string RenderThermalTicket(int orderNumber)
     {
-        // Hardware/formatting concerns — width, separators — change with printer vendor.
-        var width = 32;
-        var line = new string('=', width);
-        var body = string.Join('\n', _items.Select(i => $"* {i.Item.ToUpperInvariant()} ({i.PrepMinutes}m)"));
         var allergens = DetectAllergens();
-        var allergyLine = allergens.Count == 0 ? "ALLERGENS: none" : "ALLERGENS: " + string.Join(",", allergens);
-        return $"{line}\nORDER #{orderNumber}\nETA {EstimatedReadyMinutes(2)} MIN\n{body}\n{allergyLine}\n{line}\n";
+
+        return _thermalTicketRenderer.Render(
+            orderNumber,
+            _items,
+            EstimatedReadyMinutes(2),
+            allergens);
     }
 
     public string ExpoLaneHint()
@@ -96,5 +97,27 @@ public sealed class PrepTimeCalculator
             : itemList.Max(i => i.PrepMinutes);
 
         return Math.Max(parallel, longest);
+    }
+}
+public sealed class ThermalTicketRenderer
+{
+    public string Render(
+        int orderNumber,
+        IEnumerable<(string Item, List<string> Ingredients, int PrepMinutes)> items,
+        int estimatedMinutes,
+        IReadOnlyList<string> allergens)
+    {
+        var width = 32;
+        var line = new string('=', width);
+
+        var body = string.Join(
+            '\n',
+            items.Select(i => $"* {i.Item.ToUpperInvariant()} ({i.PrepMinutes}m)"));
+
+        var allergyLine = allergens.Count == 0
+            ? "ALLERGENS: none"
+            : "ALLERGENS: " + string.Join(",", allergens);
+
+        return $"{line}\nORDER #{orderNumber}\nETA {estimatedMinutes} MIN\n{body}\n{allergyLine}\n{line}\n";
     }
 }
