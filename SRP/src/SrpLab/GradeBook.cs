@@ -8,6 +8,7 @@ public sealed class GradeBook
     private readonly Dictionary<string, List<decimal>> _scores = new(StringComparer.OrdinalIgnoreCase);
     private readonly GradePolicy _gradePolicy = new();
     private readonly HonorRollPolicy _honorRollPolicy = new();
+    private readonly TranscriptBuilder _transcriptBuilder = new();
 
     public void Record(string studentId, decimal score)
     {
@@ -41,8 +42,12 @@ public sealed class GradeBook
 
     public string TranscriptPlain(string studentId, string fullName)
     {
-        // Registrar document format ≠ grading policy.
-        return $"TRANSCRIPT\nStudent: {fullName} ({studentId})\nAverage: {Average(studentId)}\nLetter: {Letter(studentId)}\nHonor: {MeetsHonorRoll(studentId)}\n";
+        return _transcriptBuilder.Build(
+            studentId,
+            fullName,
+            Average(studentId),
+            Letter(studentId),
+            MeetsHonorRoll(studentId));
     }
 
     public string ExportCsv()
@@ -70,5 +75,20 @@ public sealed class HonorRollPolicy
     public bool Meets(decimal average, string letter)
     {
         return average >= 85 && letter is "A" or "B";
+    }
+}
+public sealed class TranscriptBuilder
+{
+    public string Build(
+        string studentId,
+        string fullName,
+        decimal average,
+        string letter,
+        bool honor)
+    {
+        return $"TRANSCRIPT\nStudent: {fullName} ({studentId})\n" +
+               $"Average: {average}\n" +
+               $"Letter: {letter}\n" +
+               $"Honor: {honor}\n";
     }
 }
