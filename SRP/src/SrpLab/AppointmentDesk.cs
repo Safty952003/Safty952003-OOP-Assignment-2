@@ -10,6 +10,7 @@ public sealed class AppointmentDesk
     public TimeOnly Close { get; }
     public int SlotMinutes { get; }
     private readonly BusinessHoursPolicy _businessHoursPolicy = new();
+    private readonly IcsEventBuilder _icsEventBuilder = new();
 
     public AppointmentDesk(TimeOnly open, TimeOnly close, int slotMinutes)
     {
@@ -49,12 +50,11 @@ public sealed class AppointmentDesk
 
     public string ToIcs(DateTimeOffset slot, string patientName, string clinician)
     {
-        // Calendar interoperability format changes with clients — not opening hours.
-        var uid = Guid.NewGuid();
-        var end = slot.AddMinutes(SlotMinutes);
-        return "BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\n" +
-               $"UID:{uid}\nDTSTART:{slot:yyyyMMdd'T'HHmmss'Z'}\nDTEND:{end:yyyyMMdd'T'HHmmss'Z'}\n" +
-               $"SUMMARY:Visit {patientName} / {clinician}\nEND:VEVENT\nEND:VCALENDAR\n";
+        return _icsEventBuilder.Build(
+            slot,
+            patientName,
+            clinician,
+            SlotMinutes);
     }
 
     public string SmsReminder(DateTimeOffset slot, string clinicPhone)
@@ -85,5 +85,21 @@ public sealed class BusinessHoursPolicy
 
         return time >= open &&
                time.AddMinutes(slotMinutes) <= close;
+    }
+}
+public sealed class IcsEventBuilder
+{
+    public string Build(
+        DateTimeOffset slot,
+        string patientName,
+        string clinician,
+        int slotMinutes)
+    {
+        var uid = Guid.NewGuid();
+        var end = slot.AddMinutes(slotMinutes);
+
+        return "BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\n" +
+               $"UID:{uid}\nDTSTART:{slot:yyyyMMdd'T'HHmmss'Z'}\nDTEND:{end:yyyyMMdd'T'HHmmss'Z'}\n" +
+               $"SUMMARY:Visit {patientName} / {clinician}\nEND:VEVENT\nEND:VCALENDAR\n";
     }
 }
