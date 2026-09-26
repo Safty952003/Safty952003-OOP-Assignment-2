@@ -10,6 +10,7 @@ public sealed class CourseEnrollmentDesk
     public int Capacity { get; }
     public decimal Tuition { get; }
     public string CourseCode { get; }
+    private readonly WelcomePacketBuilder _welcomePacketBuilder = new();
 
     public CourseEnrollmentDesk(string courseCode, int capacity, decimal tuition)
     {
@@ -44,10 +45,11 @@ public sealed class CourseEnrollmentDesk
 
     public string WelcomePacketMarkdown(string studentEmail, string studentName)
     {
-        // Content design changes with academy marketing — not with seat algorithms.
-        var status = _seated.Contains(studentEmail) ? "confirmed seat" : $"waitlist #{WaitlistPosition(studentEmail)}";
-        return $"# Welcome to {CourseCode}\nHi {studentName},\nYour status: **{status}**.\n" +
-               $"Bring a laptop. Discord onboarding link: https://example.invalid/{CourseCode.ToLowerInvariant()}\n";
+        var status = _seated.Contains(studentEmail)
+            ? "confirmed seat"
+            : $"waitlist #{WaitlistPosition(studentEmail)}";
+
+        return _welcomePacketBuilder.Build(CourseCode, studentName, status);
     }
 
     public string TuitionInvoiceLine(string studentEmail)
@@ -68,5 +70,14 @@ public sealed class CourseEnrollmentDesk
             _seated.Add(next);
             seats--;
         }
+    }
+}
+
+public sealed class WelcomePacketBuilder
+{
+    public string Build(string courseCode, string studentName, string status)
+    {
+        return $"# Welcome to {courseCode}\nHi {studentName},\nYour status: **{status}**.\n" +
+               $"Bring a laptop. Discord onboarding link: https://example.invalid/{courseCode.ToLowerInvariant()}\n";
     }
 }
