@@ -12,6 +12,7 @@ public sealed class SubscriptionBilling
     public DateOnly PeriodStart { get; }
     public DateOnly PeriodEnd { get; }
     public int FailedPayments { get; private set; }
+    private readonly ProrationCalculator _prorationCalculator = new();
 
     public SubscriptionBilling(string customerId, decimal monthlyPrice, DateOnly periodStart, DateOnly periodEnd)
     {
@@ -23,13 +24,11 @@ public sealed class SubscriptionBilling
 
     public decimal Prorate(DateOnly activeFrom)
     {
-        // Finance calendar rules change independently of email copy.
-        if (activeFrom <= PeriodStart) return MonthlyPrice;
-        if (activeFrom >= PeriodEnd) return 0m;
-        var totalDays = PeriodEnd.DayNumber - PeriodStart.DayNumber;
-        if (totalDays <= 0) return MonthlyPrice;
-        var used = PeriodEnd.DayNumber - activeFrom.DayNumber;
-        return Math.Round(MonthlyPrice * used / totalDays, 2);
+        return _prorationCalculator.Calculate(
+            MonthlyPrice,
+            PeriodStart,
+            PeriodEnd,
+            activeFrom);
     }
 
     public string NextInvoiceNumber()
@@ -59,5 +58,30 @@ public sealed class SubscriptionBilling
     {
         // Accounting export format is another axis of change.
         return $"{CustomerId},{NextInvoiceNumber()},{Prorate(activeFrom):0.00},AR-SUB";
+    }
+}
+
+public sealed class ProrationCalculator
+{
+    public decimal Calculate(
+        decimal monthlyPrice,
+        DateOnly periodStart,
+        DateOnly periodEnd,
+        DateOnly activeFrom)
+    {
+        if (activeFrom <= periodStart)
+            return monthlyPrice;
+
+        if (activeFrom >= periodEnd)
+            return 0m;
+
+        var totalDays = periodEnd.DayNumber - periodStart.DayNumber;
+
+        if (totalDays <= 0)
+            return monthlyPrice;
+
+        var used = periodEnd.DayNumber - activeFrom.DayNumber;
+
+        return Math.Round(monthlyPrice * used / totalDays, 2);
     }
 }
