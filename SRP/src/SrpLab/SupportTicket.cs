@@ -1,0 +1,113 @@
+namespace SrpLab;
+
+/// <summary>
+/// Support ticket: SLA clocks, NLP-ish priority from free text, and public reply templates.
+/// </summary>
+public sealed class SupportTicket
+{
+    public string Id { get; }
+    public string Subject { get; private set; }
+    public string Body { get; private set; }
+    public DateTimeOffset OpenedAt { get; }
+    public string Priority { get; private set; } = "P3";
+    private readonly PriorityCalculator _priorityCalculator = new();
+    private readonly SlaCalculator _slaCalculator = new();
+    private readonly PublicReplyBuilder _publicReplyBuilder = new();
+    private readonly EscalationMessageBuilder _escalationMessageBuilder = new();
+
+    public SupportTicket(string id, string subject, string body, DateTimeOffset openedAt)
+    {
+        Id = id;
+        Subject = subject;
+        Body = body;
+        OpenedAt = openedAt;
+        RecalculatePriorityFromText();
+    }
+
+    public void AppendCustomerMessage(string text)
+    {
+        Body += "\n---\n" + text;
+        RecalculatePriorityFromText();
+    }
+
+    public void RecalculatePriorityFromText()
+    {
+        Priority = _priorityCalculator.Calculate(Subject, Body);
+    }
+
+    public DateTimeOffset SlaDeadline()
+    {
+        return _slaCalculator.Calculate(Priority, OpenedAt);
+    }
+
+    public bool IsBreached(DateTimeOffset now) => now > SlaDeadline();
+
+    public string DraftPublicReply(string agentName)
+    {
+        return _publicReplyBuilder.Build(
+            Id,
+            Priority,
+            agentName,
+            SlaDeadline());
+    }
+
+    public string InternalEscalationBlurb()
+    {
+        return _escalationMessageBuilder.Build(
+            Id,
+            Priority,
+            SlaDeadline());
+    }
+}
+
+public sealed class PriorityCalculator
+{
+    public string Calculate(string subject, string body)
+    {
+        var blob = (subject + " " + body).ToLowerInvariant();
+
+        if (blob.Contains("down") ||
+            blob.Contains("outage") ||
+            blob.Contains("cannot login"))
+            return "P1";
+
+        if (blob.Contains("urgent") ||
+            blob.Contains("asap") ||
+            blob.Contains("blocked"))
+            return "P2";
+
+        return "P3";
+    }
+}
+public sealed class SlaCalculator
+{
+    public DateTimeOffset Calculate(string priority, DateTimeOffset openedAt)
+    {
+        var hours = priority switch
+        {
+            "P1" => 4,
+            "P2" => 24,
+            _ => 72
+        };
+
+        return openedAt.AddHours(hours);
+    }
+}
+public sealed class PublicReplyBuilder
+{
+    public string Build(string ticketId, string priority, string agentName, DateTimeOffset slaDeadline)
+    {
+        var apology = priority == "P1"
+            ? "We are treating this as a critical incident."
+            : "Thanks for reaching out.";
+
+        return $"Hi,\n{apology}\nTicket {ticketId} is with {agentName}. Next update before {slaDeadline:u}.\n";
+    }
+}
+public sealed class EscalationMessageBuilder
+{
+    public string Build(string ticketId, string priority, DateTimeOffset slaDeadline)
+    {
+        return $"ESCALATE {ticketId} priority={priority} breachAt={slaDeadline:u} keywords-scanned=yes";
+    }
+}
